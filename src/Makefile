@@ -34,6 +34,5 @@ clean:
 	$(RM) $(LIB)/*.so*
 install:
 	cp lib*.so* /usr/lib64
-	cp $(INCLUDE)/$(NAME).h /usr/include
-	cp libsimpleOSD_bs.so.0 /usr/lib64/libsimpleOSD_bs.so
-	cp libsimpleOSD_bs.so.0 $(LIB)/libsimpleOSD_bs.so.0
+	cp $(INCLUDE)/*.h /usr/include
+
