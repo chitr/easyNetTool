@@ -33,7 +33,20 @@
 #ifndef SUCCESS
 #define SUCCESS 0
 #endif
+#ifndef ULIMIT_MAX
+#define ULIMIT_MAX 65535
+#endif
+#ifndef THREAD_STACK_SIZE
+#define THREAD_STACK_SIZE 2116488
+#endif
+
+
 /*****************Socket helper ***********************************************/
+
+#ifndef SOCKET_BACKLOG
+#define SOCKET_BACKLOG 100
+#endif 
+
 #ifndef RESERVED_FD_COUNT 
 #define RESERVED_FD_COUNT 3
 #endif

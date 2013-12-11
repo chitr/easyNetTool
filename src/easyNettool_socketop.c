@@ -155,7 +155,7 @@ sock_wait_select(int socketfd,
             so_error = 0;
             getsockopt (socketfd, SOL_SOCKET, SO_ERROR, &so_error, &so_len);
             if (so_error != 0){  
-				ret=SOC_ERROR;
+                ret=SOC_ERROR;
                 *p_errsv = so_error;
                 EASYNETTOOL_LOG(LOG_INFO,"wait failed");
             }
@@ -277,3 +277,39 @@ end:
     return ret ;
 }
 
+
+
+SOCKET_STATUS_t 
+bind_socket(int sockfd, 
+               struct sockaddr_in* p_serv_addr, 
+               const char* server_address, 
+               const int port_no, int *p_errsv){
+    SOCKET_STATUS_t ret=SOC_SUCCESS;
+    int errsv=0;
+    /*This function to for improving tuning socket for bind call */
+    memset(p_serv_addr, 0, sizeof(struct sockaddr_in)); 
+    p_serv_addr->sin_family = AF_INET;
+    p_serv_addr->sin_port = port_no;	
+    p_serv_addr->sin_addr.s_addr = INADDR_ANY;
+    if ( bind(sockfd, (struct sockaddr*)p_serv_addr, sizeof(struct sockaddr_in)) == -1 ) {
+        errsv=errno;
+        EASYNETTOOL_LOG(LOG_CRITICAL,"Bind failed :%s",strerror(errsv));
+        ret=SOC_ERROR;	
+		*p_errsv=errsv;
+    }
+end:
+    return ret;	
+}
+
+SOCKET_STATUS_t 
+listen_socket(int sockfd,int *p_errsv){
+    SOCKET_STATUS_t ret=SOC_SUCCESS;
+    int errsv=0;	
+    /*This function to for improving tuning socket for listen  call */
+    if(listen(sockfd, SOCKET_BACKLOG) == -1){
+        errsv=errno;
+        EASYNETTOOL_LOG(LOG_CRITICAL,"listen failed :%s",strerror(errsv));
+        ret=SOC_ERROR;	
+		*p_errsv=errsv;
+    }
+}
