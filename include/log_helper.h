@@ -66,4 +66,7 @@
 #define MAX_MSG_LEN 4096
 #endif
 
+struct timeval 
+time_diff(struct timeval time_from, struct timeval time_to);
+
 

@@ -36,6 +36,7 @@
 #include <netinet/tcp.h>
 #include <sys/statfs.h>
 #include <utime.h>
+#include <stdio.h>
 
 
 #include "easyNettool_socketop.h"
@@ -313,3 +314,108 @@ listen_socket(int sockfd,int *p_errsv){
 		*p_errsv=errsv;
     }
 }
+SOCKET_STATUS_t 
+rcv_from_socket(int sock_fd,
+                    int file_fd,
+                    int total_data_size,
+                    void *buff,
+                    int receive_buff_size,
+                    int *p_errsv){
+    /*receive data buffer of  mentioned size on socket .
+      A dynamic CPU utilization window-managent is implemented 
+      to avoid the receiver thread from hogging CPU i.e there is optimum
+      sleep is introduced based on data-transfer rate over socket.
+      Above CPU util optimization is very helpful to avoid CPU-hogging during big
+      data transfer
+      Received data is written to file_fd*/
+
+    void  *recv_data_buffer = NULL; /*Better to keep it as TLS variable*/
+
+    SOCKET_STATUS_t ret=SOC_SUCCESS;
+    	
+
+
+    ssize_t bytes, bytes_in_pipe;
+    ssize_t bytes_received=0;
+    ssize_t total_bytes_received = 0;
+    ssize_t bytes_written =0;
+
+    ssize_t last_bytes_received = 0;
+    unsigned long long sleep_multiplier=0;
+    struct timeval timer_start;
+    struct timeval timer_end;
+    struct timeval sleep_time;
+    memset(&timer_start, 0, sizeof(struct timeval));
+    memset(&timer_end, 0, sizeof(struct timeval));	
+
+
+    if(!receive_buff_size)
+        receive_buff_size = RECV_BUFF_LENGTH;
+    if(!recv_data_buffer) {
+        if(!(recv_data_buffer = malloc(RECV_BUFF_LENGTH))) {
+            *p_errsv = errno;
+            EASYNETTOOL_LOG(LOG_CRITICAL, "Failed to allocate memory for" 
+                    "recv_data_buffer size %l %s " ,RECV_BUFF_LENGTH,
+                    strerror(p_errsv));				
+            ret = SOC_IO_ERROR;
+            goto end;
+        }
+    }    
+    do{ 
+        if(bytes_received ){
+            /*bytes_received >0 ,data is not fetched  in first loop*/    
+            /*To avoid  threads hogging the CPU,we should sleep */    
+            /*timer_start = 0 for first chunk fetch*/
+
+            if(!(TIME_IS_ZERO(timer_start))){
+                gettimeofday(&timer_end,NULL);		
+                sleep_time = time_diff(timer_start,timer_end);
+
+                /*Ensure minimum sleep time is 4 ms*/
+                if(TIME_IS_ZERO(sleep_time))
+                    sleep_time.tv_usec = 4000;
+
+                /*Max data to be received for socket buffer = receive_buff_size
+                  But we recived "bytes_received" in above sleep_time.
+                  To receive "receive_buff_size" data we should increase 
+                  sleep time by factor for size_of_buffer/size_of_received_data */
+                sleep_multiplier = 
+                    ((sleep_multiplier=(receive_buff_size/bytes_received))>1)?
+                    sleep_multiplier:1;
+                TIME_MULTIPLY(sleep_time,sleep_multiplier)	
+                    if(MAX_SLEEP_IN_RECV <= sleep_time.tv_sec )
+                        sleep_time.tv_sec = MAX_SLEEP_IN_RECV;
+                select(0,NULL,NULL,NULL,&sleep_time);
+            }
+            /*We need to sleep in fetch call ,to calculate sleep time start timer*/
+            gettimeofday(&timer_start,NULL);
+        }
+        *p_errsv = 0;
+        bytes_received = recv(sock_fd,(char *)recv_data_buffer,receive_buff_size,0);
+        if(bytes_received <= 0){					
+            EASYNETTOOL_LOG(LOG_CRITICAL,"Error while receving file on socket"
+                    "access denied\n");
+            *p_errsv = errno;
+
+            if (bytes_received && (*p_errsv == EINTR || *p_errsv == EAGAIN)) {   
+                *p_errsv = 0;
+                continue;
+            }		
+            ret = SOC_STALE_SOCKET_ERROR ;
+            goto end;
+
+        }
+        bytes_written = pwrite(file_fd,(char *)recv_data_buffer,bytes_received,
+                total_bytes_received);
+        if(bytes_written !=bytes_received) {
+            EASYNETTOOL_LOG(LOG_CRITICAL,"Unable to write data to file fd");
+            *p_errsv = errno;
+            ret = SOC_IO_ERROR;
+            goto end;		
+        }		
+        total_bytes_received += bytes_received;	
+    }while ((total_bytes_received < total_data_size));	
+end:
+    return ret;
+}
+

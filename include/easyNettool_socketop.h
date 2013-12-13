@@ -40,6 +40,14 @@
 #define THREAD_STACK_SIZE 2116488
 #endif
 
+#define TIME_IS_ZERO(start_time) \
+	!(start_time.tv_sec || start_time.tv_usec)
+
+#define TIME_MULTIPLY(time,factor)  { \
+time.tv_sec = ((factor * time.tv_sec)+ ((factor*time.tv_usec)/1000000));  \
+time.tv_usec = (factor*time.tv_usec)%(1000000);\
+}
+
 
 /*****************Socket helper ***********************************************/
 
@@ -68,6 +76,17 @@ SOC_ARG_ERROR,
 SOC_ERROR,
 SOC_TIMEOUT
 }SOCKET_STATUS_t;
+
+
+#define MAX_SLEEP_IN_RECV 1
+#define RECV_BUFF_LENGTH    1048576 /*1 MB buffer for fetch data*/
+
+
+#define SOCKET_CONNECT_TIMEOUT 15 /*Timeout for connect()*/
+
+
+#define OFF   0
+#define ON    1
 
 /******* EPOLL  data **********************************************************/
 #ifndef EPOLL_ARG1
